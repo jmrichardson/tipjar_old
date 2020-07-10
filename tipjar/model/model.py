@@ -30,8 +30,6 @@ class Model:
         # print(self.model.predict(self.Xs[0]))
 
     def mcfly_model(self):
-        # Cross validation takes too long with DL
-
         self.num_models = 4
         self.num_classes = self.yseg_train.shape[1]
         self.metric = 'accuracy'
@@ -66,27 +64,6 @@ class Model:
                                          })
         self.modelcomparisons.to_csv(os.path.join(resultpath, 'modelcomparisons.csv'))
         self.modelcomparisons
-
-    def seglearn_model(self):
-        from tensorflow.python.keras.layers import Dense, LSTM, Conv1D
-        from tensorflow.python.keras.models import Sequential
-        from tensorflow.python.keras.wrappers.scikit_learn import KerasClassifier
-        from sklearn.model_selection import train_test_split
-        from seglearn.pipe import Pype
-
-        def crnn_model(width=120, n_vars=5, n_classes=2, conv_kernel_size=5,
-                       conv_filters=3, lstm_units=3):
-            input_shape = (width, n_vars)
-            model = Sequential()
-            model.add(Conv1D(filters=conv_filters, kernel_size=conv_kernel_size,
-                             padding='valid', activation='relu', input_shape=input_shape))
-            model.add(Conv1D(filters=conv_filters, kernel_size=conv_kernel_size,
-                             padding='valid', activation='relu'))
-            model.add(LSTM(units=lstm_units, dropout=0.1, recurrent_dropout=0.1))
-            model.add(Dense(n_classes, activation="softmax"))
-            model.compile(loss='categorical_crossentropy', optimizer='adam',
-                          metrics=['accuracy'])
-            return model
 
         # X_train, X_test, y_train, y_test = train_test_split(self.Xseg, self.yenc, test_size=0.25, random_state=42)
         pipe = Pype([('crnn', KerasClassifier(build_fn=crnn_model, epochs=1, batch_size=256, verbose=0))])
