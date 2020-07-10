@@ -1,0 +1,11 @@
+ipython
+mlfinlab
+pandas_ta
+pyod
+tslearn
+backtrader
+tensorflow==2.0.1
+mcfly
+
+
+
