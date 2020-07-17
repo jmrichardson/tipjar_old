@@ -14,9 +14,20 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
 import pandas_ta as ta
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
+import matrixprofile as mp
 
 
 class Process:
+
+    def matrix_profile(self):
+        # windows = [15, 30]
+        windows = [15, 30, 60, 120, 240, 480, 720]
+        self.mp = mp.compute(np.array(self.X.close), windows=windows, n_jobs=7)
+        for i, window in enumerate(windows):
+            print(window)
+            self.X['mp'+str(window)] = pd.Series(self.mp['pmp'][i]).values
+            # self.X['mpi'+str(window)] = pd.Series(self.mp['pmpi'][i]).values
+        # self.mp = mp.discover.motifs(self.mp)
 
     def add_time(self):
         """Adds time features to X"""
@@ -115,11 +126,11 @@ class Process:
 
     def save(self, file_name):
         """Save equity object"""
-        pickle.dump(self, file=open(f"cache/{file_name}.pkl", "wb"))
+        pickle.dump(self, file=open(f"tmp/{file_name}.pkl", "wb"))
 
     def load(file_name):
         """Load equity object"""
-        return pickle.load(open(f"cache/{file_name}.pkl", "rb"))
+        return pickle.load(open(f"tmp/{file_name}.pkl", "rb"))
 
     def frac_diff(self, cols=['open', 'high', 'low', 'close'], diff_amt=.4):
         """Detrend (make stationary)"""
@@ -209,10 +220,12 @@ class Process:
                     self.Xseg.append(window)
                     self.yseg.append(self.ytbl.loc[i])
         self.Xseg = np.stack(self.Xseg)
-        bin = LabelBinarizer().fit_transform(self.yseg)
-        enc = OneHotEncoder()
-        enc.fit(bin)
-        self.yseg = enc.transform(bin).toarray()
+        # bin into columns: col0=1, col1=-1, col2=0
+        # # bin = LabelBinarizer().fit_transform(self.yseg)
+        # enc = OneHotEncoder()
+        # enc = enc.fit(bin)
+        # self.yseg = enc.transform(bin).toarray()
+        self.yseg = LabelBinarizer().fit_transform(self.yseg)
 
     def train_val_test_split(self, test=.2, val=.3):
         self.Xseg_train, self.Xseg_test, self.yseg_train, self.yseg_test = train_test_split(self.Xseg, self.yseg,
