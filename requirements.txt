@@ -8,4 +8,9 @@ tensorflow==2.0.1
 # tensorflow_gpu==2.0.1
 mcfly
 matrixprofile
+sktime
+lightgbm
+deltapy
 
+# torch==1.5.1+cpu torchvision==0.6.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+# u8darts

@@ -7,10 +7,24 @@ from sklearn import metrics
 from tslearn.neighbors import KNeighborsTimeSeriesClassifier
 import os
 import mcfly
+from lightgbm import LGBMRegressor
+from sklearn.metrics import mean_squared_error
 
 
 
 class Model:
+
+    def aug_mse(self, X):
+        """Predict next day close of X to indicate if data augmentation is helpful"""
+        y = X.close.shift(-1)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=False, test_size=.35, random_state=0)
+        X_test = X_test[:-1]
+        y_test = y_test[:-1]
+        model = LGBMRegressor()
+        model.fit(X_train, y_train.values.ravel(), verbose=True)
+        preds = model.predict(X_test)
+        mse = mean_squared_error(y_test, preds)
+        print(f"MSE: {mse}")
 
     def dummy_model(self, strategy="stratified"):
         self.model = DummyClassifier(strategy=strategy, random_state=42)

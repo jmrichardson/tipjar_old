@@ -15,19 +15,65 @@ from sklearn.model_selection import train_test_split
 import pandas_ta as ta
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 import matrixprofile as mp
+from sktime.transformers.series_as_features.rocket import Rocket
+from deltapy import transform, interact, mapper, extract
 
 
 class Process:
 
-    def matrix_profile(self):
-        # windows = [15, 30]
-        windows = [15, 30, 60, 120, 240, 480, 720]
-        self.mp = mp.compute(np.array(self.X.close), windows=windows, n_jobs=7)
-        for i, window in enumerate(windows):
-            print(window)
-            self.X['mp'+str(window)] = pd.Series(self.mp['pmp'][i]).values
-            # self.X['mpi'+str(window)] = pd.Series(self.mp['pmpi'][i]).values
-        # self.mp = mp.discover.motifs(self.mp)
+    def x_aug(self):
+        # # Transformations
+        # df_out = transform.triple_exponential_smoothing(df_out.copy(), ["close"], 12, .2, .2, .2, 0);
+        # df_out = transform.harmonicradar_cw(df_out.copy(), ["close"], 0.3, 0.2);
+        # df_out = transform.butter_lowpass_filter(df_out.copy(), ["close"], 4)
+        # df_out = transform.instantaneous_phases(df_out.copy(), ["close"])
+        # df_out = transform.saw(df_out.copy(), ["close", "open"]);
+        # # df_out = interact.lowess(df_out.copy(), ["open","volume"], self.X["close"], f=0.25, iter=3);
+        # df_out = transform.instantaneous_phases(df_out.copy(), ["close"])
+        # df_out = transform.perd_feat(df_out.copy(), ["close"]);
+        # df_out = transform.harmonicradar_cw(df_out.copy(), ["close"], 0.3, 0.2);
+        # df_out = transform.multiple_lags(df_out.copy(), start=1, end=3, columns=["close"])
+        # # df = transform.kalman_feat(self.X.copy(), ["close"])
+        # # df = transform.bkb(self.X.copy(), ["close"])
+        # # df_out = transform.operations(self.X.copy(),["close"])
+        # # df_out = transform.naive_dec(self.X.copy(), ["close","open"])
+        # # df_out = transform.perd_feat(self.X.copy(),["close"])
+        # # df_out = transform.fft_feat(self.X.copy(), ["close"])
+        # # df_out = transform.modify(self.X.copy(),["close"]);
+        # # df_out = transform.multiple_rolling(self.X.copy(), columns=["close"]);
+        # # df_out = interact.autoregression(self.X.copy())
+        # # df_out = interact.muldiv(self.X.copy(), ["close","open"])
+        # # df_out = interact.decision_tree_disc(self.X.copy(), ["close"])
+        # # df_out = interact.quantile_normalize(self.X.copy(), drop=["close"]);
+        # # df_out['new'] = mapper.pca_feature(df.copy(), variance_or_components=0.9, n_components=8,non_linear=False)
+        # # df_out = mapper.cross_lag(df.copy())
+        # # df_out = mapper.encoder_dataset(df.copy(), dimesions=4);
+        # # df_out = interact.genetic_feat(self.X.copy())
+
+        # # Interactions
+        pass
+
+    def seg_np(self):
+        for i, df in enumerate(self.Xseg):
+            self.Xseg[i] = self.Xseg[i].to_numpy()
+        self.Xseg = np.stack(self.Xseg)
+
+    def seg_matrix_profile(self, windows=[5, 10]):
+        for i, df in enumerate(self.Xseg):
+            self.mp = mp.compute(np.array(self.Xseg[i].close), windows=windows)
+            for k, window in enumerate(windows):
+                self.Xseg[i]['mp' + str(window)] = pd.Series(self.mp['pmp'][k]).values
+            self.Xseg[i] = self.Xseg[i].replace([np.inf, -np.inf], np.nan)
+
+    def rocket(self):
+        self.Xskt = to_sktime_dataset(self.Xseg['close'])
+        rocket = Rocket()
+        X = rocket.fit(self.Xskt)
+        X_train_transform = rocket.transform(self.Xskt)
+        from sklearn.linear_model import RidgeClassifierCV
+
+        classifier = RidgeClassifierCV(alphas=np.logspace(-3, 3, 10), normalize=True)
+        classifier.fit(X_train_transform, self.yseg)
 
     def add_time(self):
         """Adds time features to X"""
@@ -37,6 +83,8 @@ class Process:
 
     def indicators(self):
         """Adds technical analysis indicator features to X"""
+
+        # Add new bulk strategy method to add indicators!!!
 
         # Momentum
         self.X.ta.ao(append=True)
@@ -124,6 +172,22 @@ class Process:
         self.X.ta.vp(append=True)
         # help(ta.fisher)
 
+        self.X.dropna(how='all', axis=1, inplace=True)
+
+    def seg_rocket(self):
+        """Rocket"""
+
+        # Temporarily suppress settingwithcopywarning
+        from pandas import options
+        options.mode.chained_assignment = None
+
+        for i, df in enumerate(self.Xseg):
+            print(i)
+            #  Trend
+            self.Xseg[i].ta.adx(append=True)
+
+        options.mode.chained_assignment = "warn"
+
     def save(self, file_name):
         """Save equity object"""
         pickle.dump(self, file=open(f"tmp/{file_name}.pkl", "wb"))
@@ -208,18 +272,20 @@ class Process:
         # self.Xtbl = self.X.reindex(self.Xtbl.index)
         # self.Xtbl.dropna(inplace=True)
 
-    def segment(self, sliding_window=120):
+    def seg_df(self, sliding_window=120):
+        '''Create list of dataframes'''
         self.Xseg = []
         self.yseg = []
         for i in self.Xtbl.index:
             if i in self.X.index:
                 start = self.X.index.get_loc(i)-sliding_window
                 end = self.X.index.get_loc(i)
-                window = self.X.iloc[start:end, ].to_numpy()
+                # window = self.X.iloc[start:end, ].to_numpy()
+                window = self.X.iloc[start:end, ]
                 if len(window) == sliding_window:
                     self.Xseg.append(window)
                     self.yseg.append(self.ytbl.loc[i])
-        self.Xseg = np.stack(self.Xseg)
+        # self.Xseg = np.stack(self.Xseg)
         # bin into columns: col0=1, col1=-1, col2=0
         # # bin = LabelBinarizer().fit_transform(self.yseg)
         # enc = OneHotEncoder()
@@ -249,7 +315,7 @@ class Process:
         self.Xseg = to_stumpy_dataset(self.Xseg)
 
     def sktime(self):
-        self.Xseg = to_sktime_dataset(self.Xseg)
+        self.Xskt = to_sktime_dataset(self.Xseg)
 
     def cesium(self):
         self.Xseg = to_cesium_dataset(self.Xseg)
